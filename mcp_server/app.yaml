@@ -1,0 +1,23 @@
+command:
+  - "python"
+  - "weather_mcp_server.py"
+
+resources:
+  - name: requirements
+    source:
+      path: ./requirements.txt
+  - name: lakebase-url
+    secret:
+      scope: database
+      key: lakebase-url
+      permission: READ
+
+env:
+  # No secrets needed - Open-Meteo is a free, public API
+  - name: LOG_LEVEL
+    value: "INFO"
+  # Lakebase connection for query logging
+  - name: LAKEBASE_SECRET_SCOPE
+    value: "database"
+  - name: LAKEBASE_SECRET_KEY
+    value: "lakebase-url"

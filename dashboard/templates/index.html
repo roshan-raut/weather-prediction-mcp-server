@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Weather Prediction Dashboard - Agent Bricks + Weather MCP</title>
+  <style>
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
+      max-width: 1200px; 
+      margin: 40px auto; 
+      padding: 0 16px;
+      background: #f8f9fa;
+    }
+    h1 { font-size: 1.6rem; color: #1a73e8; margin-bottom: 8px; }
+    .subtitle { color: #666; margin-bottom: 24px; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 32px; }
+    .card { 
+      background: white; 
+      border: 1px solid #e0e0e0; 
+      border-radius: 8px; 
+      padding: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .card .label { color: #666; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+    .card .value { font-size: 2rem; font-weight: 700; color: #1a73e8; }
+    .card .subvalue { font-size: 0.9rem; color: #999; margin-top: 4px; }
+    
+    .section { 
+      background: white; 
+      border: 1px solid #e0e0e0; 
+      border-radius: 8px; 
+      padding: 24px; 
+      margin-bottom: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .section h2 { font-size: 1.2rem; margin-top: 0; margin-bottom: 16px; color: #333; }
+    
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 12px 8px; border-bottom: 1px solid #f0f0f0; font-size: 0.9rem; }
+    th { background: #f8f9fa; font-weight: 600; color: #666; }
+    tbody tr:hover { background: #f8f9fa; }
+    
+    .tool-badge { 
+      display: inline-block; 
+      padding: 4px 10px; 
+      border-radius: 12px; 
+      font-size: 0.75rem; 
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .tool-current { background: #e3f2fd; color: #1976d2; }
+    .tool-forecast { background: #fff3e0; color: #f57c00; }
+    .tool-umbrella { background: #f3e5f5; color: #7b1fa2; }
+    .tool-travel { background: #e8f5e9; color: #388e3c; }
+    
+    .umbrella-yes { color: #1976d2; font-weight: 600; }
+    .umbrella-no { color: #666; }
+    
+    .error-text { color: #d32f2f; font-size: 0.85rem; }
+    .timestamp { color: #999; font-size: 0.85rem; }
+    .location { color: #1a73e8; font-weight: 500; }
+    
+    #refresh { 
+      padding: 8px 16px; 
+      cursor: pointer; 
+      background: #1a73e8; 
+      color: white; 
+      border: none; 
+      border-radius: 4px;
+      font-weight: 500;
+      margin-left: 16px;
+    }
+    #refresh:hover { background: #1557b0; }
+    
+    .stat-list { list-style: none; padding: 0; margin: 0; }
+    .stat-list li { 
+      padding: 8px 0; 
+      border-bottom: 1px solid #f0f0f0; 
+      display: flex;
+      justify-content: space-between;
+    }
+    .stat-list li:last-child { border-bottom: none; }
+    .stat-name { color: #333; }
+    .stat-value { font-weight: 600; color: #1a73e8; }
+    
+    .empty-state { 
+      text-align: center; 
+      padding: 48px 24px; 
+      color: #999;
+    }
+    .empty-state .icon { font-size: 3rem; margin-bottom: 16px; }
+  </style>
+</head>
+<body>
+  <h1>🌤️ Weather Prediction Dashboard</h1>
+  <p class="subtitle">
+    Monitoring weather queries through the Weather MCP server. 
+    Real-time view of Agent Bricks interactions with weather data.
+    <button id="refresh">Refresh</button>
+  </p>
+
+  <div class="cards">
+    <div class="card">
+      <div class="label">Total Queries</div>
+      <div class="value" id="total-queries">-</div>
+      <div class="subvalue" id="recent-24h">- in last 24h</div>
+    </div>
+    <div class="card">
+      <div class="label">Top Location</div>
+      <div class="value" id="top-location" style="font-size: 1.3rem;">-</div>
+      <div class="subvalue" id="top-location-count">- queries</div>
+    </div>
+    <div class="card">
+      <div class="label">Umbrella Needed</div>
+      <div class="value" id="umbrella-yes">-</div>
+      <div class="subvalue" id="umbrella-stats">of predictions</div>
+    </div>
+    <div class="card">
+      <div class="label">Most Used Tool</div>
+      <div class="value" id="top-tool" style="font-size: 1.1rem;">-</div>
+      <div class="subvalue" id="top-tool-count">- calls</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>📊 Tool Usage Statistics</h2>
+    <ul class="stat-list" id="tool-stats"></ul>
+  </div>
+
+  <div class="section">
+    <h2>📍 Top Locations</h2>
+    <ul class="stat-list" id="location-stats"></ul>
+  </div>
+
+  <div class="section">
+    <h2>🕐 Recent Weather Queries</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Tool</th>
+          <th>Location</th>
+          <th>User</th>
+          <th>Result</th>
+        </tr>
+      </thead>
+      <tbody id="queries-body"></tbody>
+    </table>
+    <div id="empty-queries" class="empty-state" style="display: none;">
+      <div class="icon">📭</div>
+      <p>No weather queries yet. Start using the Weather MCP server!</p>
+    </div>
+  </div>
+
+  <script>
+    function getToolBadgeClass(toolName) {
+      if (toolName.includes('current')) return 'tool-current';
+      if (toolName.includes('forecast')) return 'tool-forecast';
+      if (toolName.includes('umbrella')) return 'tool-umbrella';
+      if (toolName.includes('travel')) return 'tool-travel';
+      return 'tool-current';
+    }
+
+    function formatToolName(toolName) {
+      return toolName.replace(/_/g, ' ').replace(/get |predict /gi, '');
+    }
+
+    function formatTimestamp(ts) {
+      const date = new Date(ts);
+      const now = new Date();
+      const diff = now - date;
+      const minutes = Math.floor(diff / 60000);
+      const hours = Math.floor(diff / 3600000);
+      
+      if (minutes < 1) return 'Just now';
+      if (minutes < 60) return `${minutes}m ago`;
+      if (hours < 24) return `${hours}h ago`;
+      return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+    }
+
+    function formatResult(query) {
+      if (query.error) {
+        return `<span class="error-text">Error: ${query.error}</span>`;
+      }
+      
+      if (!query.result) {
+        return '<span style="color: #999;">No result</span>';
+      }
+
+      const result = query.result;
+      
+      // Handle umbrella prediction
+      if (query.tool_name === 'predict_umbrella_needed' && result.umbrella_needed !== undefined) {
+        const umbrellaClass = result.umbrella_needed ? 'umbrella-yes' : 'umbrella-no';
+        const umbrellaText = result.umbrella_needed ? '☂️ Yes' : '☀️ No';
+        return `<span class="${umbrellaClass}">${umbrellaText}</span>`;
+      }
+      
+      // Handle current weather
+      if (query.tool_name === 'get_current_weather' && result.temperature) {
+        return `${result.temperature}°F, ${result.conditions || 'N/A'}`;
+      }
+      
+      // Handle forecast
+      if (query.tool_name === 'get_forecast' && result.forecast) {
+        return `${result.forecast.length} days forecast`;
+      }
+      
+      // Handle travel recommendation
+      if (query.tool_name === 'get_travel_recommendation' && result.overall_recommendation) {
+        return result.overall_recommendation.substring(0, 50) + '...';
+      }
+      
+      return '<span style="color: #999;">Success</span>';
+    }
+
+    async function refresh() {
+      try {
+        const [stats, queries] = await Promise.all([
+          fetch('/api/statistics').then(r => r.json()),
+          fetch('/api/queries?limit=50').then(r => r.json()),
+        ]);
+
+        // Update summary cards
+        document.getElementById('total-queries').textContent = stats.total_queries.toLocaleString();
+        document.getElementById('recent-24h').textContent = `${stats.recent_24h} in last 24h`;
+        
+        if (stats.top_locations && stats.top_locations.length > 0) {
+          document.getElementById('top-location').textContent = stats.top_locations[0].location;
+          document.getElementById('top-location-count').textContent = `${stats.top_locations[0].count} queries`;
+        }
+        
+        if (stats.umbrella_stats && stats.umbrella_stats.length > 0) {
+          const yesCount = stats.umbrella_stats.find(s => s.umbrella_needed === true)?.count || 0;
+          const totalUmbrella = stats.umbrella_stats.reduce((sum, s) => sum + s.count, 0);
+          document.getElementById('umbrella-yes').textContent = yesCount;
+          document.getElementById('umbrella-stats').textContent = `of ${totalUmbrella} predictions`;
+        }
+        
+        if (stats.by_tool && stats.by_tool.length > 0) {
+          document.getElementById('top-tool').textContent = formatToolName(stats.by_tool[0].tool_name);
+          document.getElementById('top-tool-count').textContent = `${stats.by_tool[0].count} calls`;
+        }
+
+        // Update tool statistics
+        const toolStatsList = document.getElementById('tool-stats');
+        toolStatsList.innerHTML = '';
+        if (stats.by_tool && stats.by_tool.length > 0) {
+          stats.by_tool.forEach(tool => {
+            toolStatsList.innerHTML += `<li>
+              <span class="stat-name">${formatToolName(tool.tool_name)}</span>
+              <span class="stat-value">${tool.count}</span>
+            </li>`;
+          });
+        } else {
+          toolStatsList.innerHTML = '<li><span class="stat-name" style="color: #999;">No data yet</span></li>';
+        }
+
+        // Update location statistics
+        const locationStatsList = document.getElementById('location-stats');
+        locationStatsList.innerHTML = '';
+        if (stats.top_locations && stats.top_locations.length > 0) {
+          stats.top_locations.forEach(loc => {
+            locationStatsList.innerHTML += `<li>
+              <span class="stat-name">${loc.location}</span>
+              <span class="stat-value">${loc.count}</span>
+            </li>`;
+          });
+        } else {
+          locationStatsList.innerHTML = '<li><span class="stat-name" style="color: #999;">No data yet</span></li>';
+        }
+
+        // Update queries table
+        const queriesBody = document.getElementById('queries-body');
+        const emptyState = document.getElementById('empty-queries');
+        
+        if (queries.length === 0) {
+          queriesBody.innerHTML = '';
+          emptyState.style.display = 'block';
+        } else {
+          emptyState.style.display = 'none';
+          queriesBody.innerHTML = '';
+          queries.forEach(q => {
+            const badgeClass = getToolBadgeClass(q.tool_name);
+            queriesBody.innerHTML += `<tr>
+              <td class="timestamp">${formatTimestamp(q.timestamp)}</td>
+              <td><span class="tool-badge ${badgeClass}">${formatToolName(q.tool_name)}</span></td>
+              <td class="location">${q.location || '-'}</td>
+              <td style="color: #666; font-size: 0.85rem;">${q.user_email || 'Unknown'}</td>
+              <td>${formatResult(q)}</td>
+            </tr>`;
+          });
+        }
+      } catch (error) {
+        console.error('Error refreshing dashboard:', error);
+      }
+    }
+
+    document.getElementById('refresh').addEventListener('click', refresh);
+    refresh();
+    setInterval(refresh, 15000); // Refresh every 15 seconds
+  </script>
+</body>
+</html>
